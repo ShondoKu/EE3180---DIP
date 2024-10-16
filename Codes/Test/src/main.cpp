@@ -19,8 +19,10 @@ float _dB;
 float _temperature, _humidity;
 
 
-const char* ssid = "TP-LINK_0248";
-const char* password = "35353577";
+//const char* ssid = "TP-LINK_0248";
+const char* ssid = "Sean";
+//const char* password = "35353577";
+const char* password = "whatpassword";
 String TS_apiKey = "EGLOW3A9ZEGHGOHD";
 const char* TS_server = "api.thingspeak.com";
 
