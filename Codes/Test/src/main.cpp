@@ -4,7 +4,7 @@
 #include <Adafruit_BME280.h>
 #include <SoftwareSerial.h>
 #define SoundSensorPin A0
-#define VREF 3
+#define VREF 3.26
 #define PMS7003_TX 12
 #define PMS7003_RX 14
 #define PMS7003_PREAMBLE_1  0x42 // From PMS7003 datasheet
@@ -18,11 +18,12 @@ int _pm1,_pm25,_pm10;
 float _dB;
 float _temperature, _humidity;
 
+//const char* ssid = "Sean";
+//const char* password = "whatpassword";
 
-//const char* ssid = "TP-LINK_0248";
-const char* ssid = "Sean";
-//const char* password = "35353577";
-const char* password = "whatpassword";
+const char* ssid = "TP-LINK_0248";
+const char* password = "35353577";
+
 String TS_apiKey = "EGLOW3A9ZEGHGOHD";
 const char* TS_server = "api.thingspeak.com";
 
@@ -155,6 +156,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  delay(600000);
   readdBSensor();
   readPMSSensor();
   readTempHumdSensor();
