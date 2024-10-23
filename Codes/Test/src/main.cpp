@@ -18,11 +18,11 @@ int _pm1,_pm25,_pm10;
 float _dB;
 float _temperature, _humidity;
 
-//const char* ssid = "Sean";
-//const char* password = "whatpassword";
+const char* ssid = "Sean";
+const char* password = "whatpassword";
 
-const char* ssid = "TP-LINK_0248";
-const char* password = "35353577";
+//const char* ssid = "TP-LINK_0248";
+//const char* password = "35353577";
 
 String TS_apiKey = "EGLOW3A9ZEGHGOHD";
 const char* TS_server = "api.thingspeak.com";
@@ -78,7 +78,6 @@ void readTempHumdSensor(){
   Serial.println("  %");   
   Serial.println();
 }
-
 void readdBSensor(){
   float voltageValue;
     voltageValue = analogRead(SoundSensorPin) / 1024.0 * VREF;
