@@ -3,8 +3,11 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <SoftwareSerial.h>
+#include <TelegramBot.h>
+#include <ArduinoJson.h>
+#include "ThingSpeak.h" 
 #define SoundSensorPin A0
-#define VREF 5.1
+#define VREF 3
 #define PMS7003_TX 12
 #define PMS7003_RX 14
 #define PMS7003_PREAMBLE_1  0x42 // From PMS7003 datasheet
@@ -30,7 +33,24 @@ const char* password = "35353577";
 String TS_apiKey = "EGLOW3A9ZEGHGOHD";
 const char* TS_server = "api.thingspeak.com";
 
+unsigned long myWriteChannelNumber = 2649409;
+unsigned long myReadChannelNumber = 2660664;
+const char * myWriteAPIKey = "EGLOW3A9ZEGHGOHD";
+const char * myReadAPIKey = "OYBEVIRYYKNZXSAY"; //to ask theem for channel
+
+const char BotToken[] = SECRET_BOT_TOKEN; //Make telebot
+
+float predicted_temp = 0;
+float predicted_humid = 0;
+float predicted_pm25 = 0;
+float predicted_pm10 = 0;
+float predicted_dB = 0;
+
 WiFiClient client;
+TelegramBot bot (BotToken, client);
+TelegramKeyboard keyboard_one; //todo if got time
+int statusCode = 0;
+int field[6] = {1,2,3,4,5,6}
 
 void uploadCloud(float dB, int pm1, int pm25, int pm10, float temp, float humid) {
   if (client.connect(TS_server, 80))
@@ -67,6 +87,42 @@ void uploadCloud(float dB, int pm1, int pm25, int pm10, float temp, float humid)
       Serial.println();
 
       delay(2000); 
+}
+
+void uploadCloud2(float dB, int pm1, int pm25, int pm10, float temp, float humid){
+  
+  ThingSpeak.setField(1, dB);
+  ThingSpeak.setField(2, pm1);
+  ThingSpeak.setField(3, pm25);
+  ThingSpeak.setField(4, pm10);
+  ThingSpeak.setField(5, temp);
+  ThingSpeak.setField(6, humid);
+
+  int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+  if(x == 200){
+    Serial.println("Channel update successful.");
+  }
+  else{
+    Serial.println("Problem updating channel. HTTP error code " + String(x));
+  }
+}
+
+void readpredictedCloud(){
+  statusCode = ThingSpeak.readMultipleFields(myReadChannelNumber);
+
+  if(statusCode == 200)
+  {
+    predicted_temp = ThingSpeak.getFieldAsFloat(field[4]);
+    predicted_humid = ThingSpeak.getFieldAsFloat(field[5]);
+    predicted_pm25 = ThingSpeak.getFieldAsFloat(field[2]);
+    predicted_pm10 = ThingSpeak.getFieldAsFloat(field[3]);
+    predicted_dB = ThingSpeak.getFieldAsFloat(field[0]);
+  }
+
+}
+
+void sendcCurrentValuesToUser(){
+
 }
 
 void readTempHumdSensor(){
@@ -158,7 +214,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  //elay(600000)
+  delay(600000);
   readdBSensor();
   readPMSSensor();
   readTempHumdSensor();
