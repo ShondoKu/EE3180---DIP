@@ -28,6 +28,9 @@ const unsigned long BOT_MTBS = 1000;
 unsigned long last_UploadTime;
 const unsigned long uploadInterval = 600000;
 
+unsigned long lastCheckHazardTime;
+const unsigned long checkHazard = 10000;
+
 int _pm1, _pm25, _pm10;
 float _dB;
 float _temperature, _humidity;
@@ -61,6 +64,7 @@ UniversalTelegramBot bot(BotToken, client);
 // TelegramKeyboard keyboard_one; //todo if got time
 int statusCode = 0;
 int field[3] = {1, 2, 3};
+float predicted[3] = {NAN, NAN, NAN}; // pm2.5,pm10,dB
 
 void uploadCloud2(float dB, int pm1, int pm25, int pm10, float temp, float humid)
 {
@@ -175,7 +179,6 @@ void sendCurrentValuesToUser()
 }
 void sendPredictedValuesToUser()
 {
-  float predicted[3] = {NAN, NAN, NAN};
 
   for (int i = 0; i < sizeof(predicted); i++)
   {
@@ -190,11 +193,108 @@ void sendPredictedValuesToUser()
     }
   }
 
-  tele_Message = "🔮 *Average Predicted Sensor Trends:*\n\n"; // want to try to bold
+  tele_Message = "🔮 *Predicted Environment!:*\n\n"; // want to try to bold
   tele_Message += "Predicted PM2.5: " + String(predicted[0]) + " µg/m³\n";
   tele_Message += "Predicted PM10: " + String(predicted[1]) + " µg/m³\n";
   tele_Message += "Predicted Noise: " + String(predicted[2]) + " dB\n";
-  tele_Message += "\n[Predicted Gauges](https://thingspeak.mathworks.com/apps/matlab_visualizations/587793?height=auto&width=auto)";
+  tele_Message += "\n[Predicted Gauges](https://thingspeak.mathworks.com/apps/matlab_visualizations/587793?height=auto&width=auto)\n";
+}
+
+void hazardCurrentValues()
+{
+  tele_Message = "⚠️ Hazardous Levels in the surronding area ⚠️\n";
+  if (_dB >= 85 && _dB <= 89.9)
+  {
+    tele_Message += "Current Readings at " + String(_dB) + " dB!\n" + "Do not be in the area for more than 8 hours!\n" + "Risk of hearing damage!\n";
+  }
+  if (_dB >= 90 && _dB <= 94.9)
+  {
+    tele_Message += "Current Readings at " + String(_dB) + " dB!\n" + "Do not be in the area for more than 2 hours!\n" + "Risk of hearing damage!\n";
+  }
+  if (_dB >= 95 && _dB <= 119.9)
+  {
+    tele_Message += "Current Readings at " + String(_dB) + " dB!\n" + "Do not be in the area for more than 15 minutes!\n" + "Risk of hearing damage!\n";
+  }
+  if (_dB >= 120)
+  {
+    tele_Message += "Current Readings at " + String(_dB) + " dB!\n" + "Area is not safe!\n" + "Immediate Pain and Hearing Damage at highest risk!\n";
+  }
+
+  if (_pm25 >= 55.5 && _pm25 <= 150.4)
+  {
+    tele_Message += "Current Readings at " + String(_pm25) + " µg/m³!\n" + "Currently in Unhealthy range (55.5 - 150.4)!\n" + "Wear a mask if you are sensitive!\n";
+  }
+  if (_pm25 >= 150.5 && _pm25 <= 250.4)
+  {
+    tele_Message += "Current Readings at " + String(_pm25) + " µg/m³!\n" + "Currently in Very Unhealthy range (150.5 - 250.4)!\n" + "Highly encouraged to wear a N95 mask!\n";
+  }
+  if (_pm25 >= 250)
+  {
+    tele_Message += "Current Readings at " + String(_pm25) + " µg/m³!\n" + "Area is not safe!\nCurrently in Hazardous Range (>250)!" + "Wear a N95 mask or stay indoors!\n";
+  }
+
+  if (_pm10 >= 255 && _pm10 <= 354)
+  {
+    tele_Message += "Current Readings at " + String(_pm10) + " µg/m³!\n" + "Currently in Unhealthy range (255 - 354)!\n" + "Wear a mask if you are sensitive!\n";
+  }
+  if (_pm10 >= 255 && _pm10 <= 424)
+  {
+    tele_Message += "Current Readings at " + String(_pm10) + " µg/m³!\n" + "Currently in Very Unhealthy range (255 - 424)!\n" + "Highly encouraged to wear a N95 mask!\n";
+  }
+  if (_pm10 >= 425)
+  {
+    tele_Message += "Current Readings at " + String(_pm10) + " µg/m³!\n" + "Area is not safe!\nCurrently in Hazardous Range (>425)!" + "Wear a N95 mask or stay indoors!\n";
+  }
+  bot.sendMessage("824917767", tele_Message, "");
+}
+void hazardPredictedValues()
+{
+
+  tele_Message = "⚠️ Potential Hazardous Levels in the surronding area ⚠️\n";
+  if (predicted[2] >= 85 && predicted[2] <= 89.9)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[2]) + " dB!\n" + "Do not be in the area for more than 8 hours!\n" + "Risk of hearing damage!\n";
+  }
+  if (predicted[2] >= 90 && predicted[2] <= 94.9)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[2]) + " dB!\n" + "Do not be in the area for more than 2 hours!\n" + "Risk of hearing damage!\n";
+  }
+  if (predicted[2] >= 95 && predicted[2] <= 119.9)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[2]) + " dB!\n" + "Do not be in the area for more than 15 minutes!\n" + "Risk of hearing damage!\n";
+  }
+  if (predicted[2] >= 120)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[2]) + " dB!\n" + "Area is not safe!\n" + "Immediate Pain and Hearing Damage at highest risk!\n";
+  }
+
+  if (predicted[0] >= 55.5 && predicted[0] <= 150.4)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[0]) + " µg/m³!\n" + "Predicted readings at Unhealthy range (55.5 - 150.4)!\n" + "Wear a mask if you are sensitive!\n";
+  }
+  if (predicted[0] >= 150.5 && predicted[0] <= 250.4)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[0]) + " µg/m³!\n" + "Predicted readings at Very Unhealthy range (150.5 - 250.4)!\n" + "Highly encouraged to wear a N95 mask!\n";
+  }
+  if (predicted[0] >= 250)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[0]) + " µg/m³!\n" + "Area is not safe!\nPredicted readings at Hazardous Range (>250)!" + "Wear a N95 mask or stay indoors!\n";
+  }
+
+  if (predicted[1] >= 255 && predicted[1] <= 354)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[1]) + " µg/m³!\n" + "Predicted readings at Unhealthy range (255 - 354)!\n" + "Wear a mask if you are sensitive!\n";
+  }
+  if (predicted[1] >= 255 && predicted[1] <= 424)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[1]) + " µg/m³!\n" + "Predicted readings at Very Unhealthy range (255 - 424)!\n" + "Highly encouraged to wear a N95 mask!\n";
+  }
+  if (predicted[1] >= 425)
+  {
+    tele_Message += "Predicted Readings at " + String(predicted[1]) + " µg/m³!\n" + "Area is not safe!\nPredicted readings at Hazardous Range (>425)!" + "Wear a N95 mask or stay indoors!\n";
+  }
+
+  bot.sendMessage("824917767", tele_Message, "");
 }
 
 void handleNewMessages(int numNewMessages)
@@ -249,6 +349,7 @@ void setup()
 
 void loop()
 {
+
   if (millis() - bot_lasttime > BOT_MTBS)
   {
     int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
@@ -269,5 +370,22 @@ void loop()
     readTempHumdSensor();
     uploadCloud2(_dB, _pm1, _pm25, _pm10, _temperature, _humidity);
     last_UploadTime = millis();
+  }
+  if (millis() - lastCheckHazardTime >= checkHazard)
+  {
+    readdBSensor();
+    readPMSSensor();
+    sendPredictedValuesToUser();
+    
+
+    if (_dB >= 85.0 || _pm25 >= 55.5 || _pm10 >= 255.0)
+    {
+      hazardCurrentValues();
+    }
+    if (predicted[2] >= 85.0 || predicted[0] >= 55.5 || predicted[1] >= 255.0)
+    {
+      hazardPredictedValues();
+    }
+    lastCheckHazardTime = millis();
   }
 }
