@@ -25,13 +25,13 @@ unsigned long bot_lasttime; // last time messages' scan has been done
 const unsigned long BOT_MTBS = 1000;
 
 unsigned long last_UploadTime;
-const unsigned long uploadInterval = 600000; //cam change for showcase
+const unsigned long uploadInterval = 600000; // cam change for showcase
 
 unsigned long lastCheckHazardTime;
-const unsigned long checkHazard = 10000; 
+const unsigned long checkHazard = 10000;
 
 unsigned long lastHazardMessageTime;
-const unsigned long hazardMessageInterval = 600000; //can change for showcase
+const unsigned long hazardMessageInterval = 600000; // can change for showcase
 bool hazardMessageSent = false;
 
 int _pm1, _pm25, _pm10;
@@ -326,7 +326,6 @@ void handleNewMessages(int numNewMessages)
   }
 }
 
-
 void setup()
 {
   // put your setup code here, to run once:
@@ -381,14 +380,13 @@ void loop()
     readdBSensor();
     readPMSSensor();
     sendPredictedValuesToUser();
-    _dB = 85;
     if ((_dB >= 85.0 || _pm25 >= 55.5 || _pm10 >= 255.0) && !hazardMessageSent)
     {
       hazardCurrentValues();
     }
     else
     {
-      if(millis() - lastHazardMessageTime >= hazardMessageInterval)
+      if (millis() - lastHazardMessageTime >= hazardMessageInterval)
       {
         hazardMessageSent = false;
       }
@@ -399,15 +397,11 @@ void loop()
     }
     else
     {
-      if(millis() - lastHazardMessageTime >= hazardMessageInterval)
+      if (millis() - lastHazardMessageTime >= hazardMessageInterval)
       {
         hazardMessageSent = false;
       }
     }
     lastCheckHazardTime = millis();
-  } 
-  else if(hazardMessageSent)
-  {
-
   }
 }
