@@ -18,7 +18,6 @@
 #define BotToken "7706841902:AAG4sGQWfzoLxMo0NqCftb0wddZ9PjHv_ww" // https://t.me/SmartEnviroBot
 
 SoftwareSerial _serial(PMS7003_TX, PMS7003_RX); // RX,TX
-
 Adafruit_BME280 bme;
 
 String tele_Message;
@@ -26,10 +25,14 @@ unsigned long bot_lasttime; // last time messages' scan has been done
 const unsigned long BOT_MTBS = 1000;
 
 unsigned long last_UploadTime;
-const unsigned long uploadInterval = 600000;
+const unsigned long uploadInterval = 600000; //cam change for showcase
 
 unsigned long lastCheckHazardTime;
-const unsigned long checkHazard = 10000;
+const unsigned long checkHazard = 10000; 
+
+unsigned long lastHazardMessageTime;
+const unsigned long hazardMessageInterval = 600000; //can change for showcase
+bool hazardMessageSent = false;
 
 int _pm1, _pm25, _pm10;
 float _dB;
@@ -51,10 +54,6 @@ unsigned long myWriteChannelNumber = 2649409;
 unsigned long myReadChannelNumber = 2660664;
 const char *myWriteAPIKey = "EGLOW3A9ZEGHGOHD";
 const char *myReadAPIKey = "OYBEVIRYYKNZXSAY"; // to ask theem for channel
-
-float predicted_pm25 = 0;
-float predicted_pm10 = 0;
-float predicted_dB = 0;
 
 X509List cert(TELEGRAM_CERTIFICATE_ROOT);
 WiFiClientSecure client;
@@ -246,6 +245,8 @@ void hazardCurrentValues()
     tele_Message += "Current Readings at " + String(_pm10) + " µg/m³!\n" + "Area is not safe!\nCurrently in Hazardous Range (>425)!" + "Wear a N95 mask or stay indoors!\n";
   }
   bot.sendMessage("824917767", tele_Message, "");
+  hazardMessageSent = true;
+  lastHazardMessageTime = millis();
 }
 void hazardPredictedValues()
 {
@@ -295,6 +296,9 @@ void hazardPredictedValues()
   }
 
   bot.sendMessage("824917767", tele_Message, "");
+
+  hazardMessageSent = true;
+  lastHazardMessageTime = millis();
 }
 
 void handleNewMessages(int numNewMessages)
@@ -321,6 +325,7 @@ void handleNewMessages(int numNewMessages)
     }
   }
 }
+
 
 void setup()
 {
@@ -376,16 +381,33 @@ void loop()
     readdBSensor();
     readPMSSensor();
     sendPredictedValuesToUser();
-    
-
-    if (_dB >= 85.0 || _pm25 >= 55.5 || _pm10 >= 255.0)
+    _dB = 85;
+    if ((_dB >= 85.0 || _pm25 >= 55.5 || _pm10 >= 255.0) && !hazardMessageSent)
     {
       hazardCurrentValues();
+    }
+    else
+    {
+      if(millis() - lastHazardMessageTime >= hazardMessageInterval)
+      {
+        hazardMessageSent = false;
+      }
     }
     if (predicted[2] >= 85.0 || predicted[0] >= 55.5 || predicted[1] >= 255.0)
     {
       hazardPredictedValues();
     }
+    else
+    {
+      if(millis() - lastHazardMessageTime >= hazardMessageInterval)
+      {
+        hazardMessageSent = false;
+      }
+    }
     lastCheckHazardTime = millis();
+  } 
+  else if(hazardMessageSent)
+  {
+
   }
 }
