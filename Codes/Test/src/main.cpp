@@ -26,7 +26,7 @@ unsigned long bot_lasttime; // last time messages' scan has been done
 const unsigned long BOT_MTBS = 1000;
 
 unsigned long last_UploadTime;
-const unsigned long uploadInterval = 15000;
+const unsigned long uploadInterval = 600000;
 
 int _pm1, _pm25, _pm10;
 float _dB;
@@ -35,11 +35,11 @@ float _temperature, _humidity;
 // const char* ssid = "Sean";
 // const char* password = "whatpassword";
 
-const char* ssid = "For Peasant";
-const char* password = "Ilovehuskies123";
+const char *ssid = "SHONDO 3544";
+const char *password = "testing123";
 
-//const char *ssid = "TP-LINK_0248";
-//const char *password = "35353577";
+// const char *ssid = "TP-LINK_0248";
+// const char *password = "35353577";
 
 String TS_apiKey = "EGLOW3A9ZEGHGOHD";
 const char *TS_server = "api.thingspeak.com";
@@ -49,8 +49,6 @@ unsigned long myReadChannelNumber = 2660664;
 const char *myWriteAPIKey = "EGLOW3A9ZEGHGOHD";
 const char *myReadAPIKey = "OYBEVIRYYKNZXSAY"; // to ask theem for channel
 
-float predicted_temp = 0;
-float predicted_humid = 0;
 float predicted_pm25 = 0;
 float predicted_pm10 = 0;
 float predicted_dB = 0;
@@ -62,45 +60,7 @@ UniversalTelegramBot bot(BotToken, client);
 
 // TelegramKeyboard keyboard_one; //todo if got time
 int statusCode = 0;
-int field[6] = {1, 2, 3, 4, 5, 6};
-
-void uploadCloud(float dB, int pm1, int pm25, int pm10, float temp, float humid)
-{
-  if (client.connect(TS_server, 80))
-  {
-    String postStr = TS_apiKey;
-    postStr += "&field1=";
-    postStr += String(dB);
-    postStr += "&field2=";
-    postStr += String(pm1);
-    postStr += "&field3=";
-    postStr += String(pm25);
-    postStr += "&field4=";
-    postStr += String(pm10);
-    postStr += "&field5=";
-    postStr += String(temp);
-    postStr += "&field6=";
-    postStr += String(humid);
-    postStr += "r\n";
-
-    client.print("POST /update HTTP/1.1\n");
-    client.print("Host: api.thingspeak.com\n");
-    client.print("Connection: close\n");
-    client.print("X-THINGSPEAKAPIKEY: " + TS_apiKey + "\n");
-    client.print("Content-Type: application/x-www-form-urlencoded\n");
-    client.print("Content-Length: ");
-    client.print(postStr.length());
-    client.print("\n\n");
-    client.print(postStr);
-
-    Serial.println("Data Send to Thingspeak");
-  }
-  client.stop();
-  Serial.println("Waiting...");
-  Serial.println();
-
-  delay(2000);
-}
+int field[3] = {1, 2, 3};
 
 void uploadCloud2(float dB, int pm1, int pm25, int pm10, float temp, float humid)
 {
@@ -120,20 +80,6 @@ void uploadCloud2(float dB, int pm1, int pm25, int pm10, float temp, float humid
   else
   {
     Serial.println("Problem updating channel. HTTP error code " + String(x));
-  }
-}
-
-void readpredictedCloud()
-{
-  statusCode = ThingSpeak.readMultipleFields(myReadChannelNumber);
-
-  if (statusCode == 200)
-  {
-    predicted_temp = ThingSpeak.getFieldAsFloat(field[4]);
-    predicted_humid = ThingSpeak.getFieldAsFloat(field[5]);
-    predicted_pm25 = ThingSpeak.getFieldAsFloat(field[2]);
-    predicted_pm10 = ThingSpeak.getFieldAsFloat(field[3]);
-    predicted_dB = ThingSpeak.getFieldAsFloat(field[0]);
   }
 }
 
@@ -215,19 +161,42 @@ void readPMSSensor()
   Serial.println();
 }
 
-void sendcCurrentValuesToUser()
+void sendCurrentValuesToUser()
 {
   readdBSensor();
   readPMSSensor();
   readTempHumdSensor();
-  tele_Message = "🌡️ *Sensor Trends:*\n\n";
-  tele_Message += "Temperature: " + String(_temperature) + "°C\n"; //+ tempTrend + "\n";
-  tele_Message += "Humidity: " + String(_humidity) + "%\n ";       //+ humidityTrend + "\n";
-  tele_Message += "PM2.5: " + String(_pm25) + "µg/m³\n";           //+ pm25Trend + "\n";
-  tele_Message += "PM10: " + String(_pm10) + "µg/m³\n";            //+ pm10Trend + "\n";
-  tele_Message += "Noise Level: " + String(_dB) + "dB\n";          // + noiseTrend + "\n";
-  // bot.sendMessage('u', tele_Message, "");
+  tele_Message = "🌡️ *Current Reading :*\n\n";                      // want to try to bold
+  tele_Message += "Temperature: " + String(_temperature) + " °C\n"; //+ tempTrend + "\n";
+  tele_Message += "Humidity: " + String(_humidity) + " %\n";        //+ humidityTrend + "\n";
+  tele_Message += "PM2.5: " + String(_pm25) + " µg/m³\n";           //+ pm25Trend + "\n";
+  tele_Message += "PM10: " + String(_pm10) + " µg/m³\n";            //+ pm10Trend + "\n";
+  tele_Message += "Noise Level: " + String(_dB) + " dB\n";          // + noiseTrend + "\n";
 }
+void sendPredictedValuesToUser()
+{
+  float predicted[3] = {NAN, NAN, NAN};
+
+  for (int i = 0; i < sizeof(predicted); i++)
+  {
+    while (isnan(predicted[i]))
+    {
+      predicted[i] = ThingSpeak.readFloatField(myReadChannelNumber, i + 1);
+      statusCode = ThingSpeak.getLastReadStatus();
+      if (statusCode != 200)
+      {
+        Serial.println("Problem reading channel. HTTP error code " + String(statusCode));
+      }
+    }
+  }
+
+  tele_Message = "🔮 *Average Predicted Sensor Trends:*\n\n"; // want to try to bold
+  tele_Message += "Predicted PM2.5: " + String(predicted[0]) + " µg/m³\n";
+  tele_Message += "Predicted PM10: " + String(predicted[1]) + " µg/m³\n";
+  tele_Message += "Predicted Noise: " + String(predicted[2]) + " dB\n";
+  tele_Message += "\n[Predicted Gauges](https://thingspeak.mathworks.com/apps/matlab_visualizations/587793?height=auto&width=auto)";
+}
+
 void handleNewMessages(int numNewMessages)
 {
   Serial.print("handleNewMessages ");
@@ -242,17 +211,13 @@ void handleNewMessages(int numNewMessages)
 
     if (text == "/start")
     {
-      readdBSensor();
-      readPMSSensor();
-      readTempHumdSensor();
-      tele_Message = "🌡️ *Sensor Trends:*\n\n";
-      tele_Message += "Temperature: " + String(_temperature) + "°C\n"; //+ tempTrend + "\n";
-      tele_Message += "Humidity: " + String(_humidity) + "%\n ";       //+ humidityTrend + "\n";
-      tele_Message += "PM2.5: " + String(_pm25) + "µg/m³\n";           //+ pm25Trend + "\n";
-      tele_Message += "PM10: " + String(_pm10) + "µg/m³\n";            //+ pm10Trend + "\n";
-      tele_Message += "Noise Level: " + String(_dB) + "dB\n";          // + noiseTrend + "\n";
+      sendCurrentValuesToUser();
       bot.sendMessage(chat_id, tele_Message, "");
-      
+    }
+    if (text == "/predicted")
+    {
+      sendPredictedValuesToUser();
+      bot.sendMessage(chat_id, tele_Message, "");
     }
   }
 }
