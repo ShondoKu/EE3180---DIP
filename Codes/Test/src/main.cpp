@@ -1,69 +1,71 @@
 #include <Arduino.h>
-#include <WiFiClientSecure.h>
-#include <WiFiClient.h>
+#include <WiFiClientSecure.h> //used for telegram and ESP
+#include <WiFiClient.h>       //used for TS
 #include <ESP8266WiFi.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include <SoftwareSerial.h>
-#include <ArduinoJson.h>
+#include <SoftwareSerial.h> //used for PMS7003
+#include <ArduinoJson.h>    //needed for Telebot library to work
 #include <UniversalTelegramBot.h>
 #include "ThingSpeak.h"
-#define SoundSensorPin A0
-#define VREF 3
-#define PMS7003_TX 12
-#define PMS7003_RX 14
+
+#define SoundSensorPin A0 // SEN0232 Pin
+#define VREF 3            // voltage supplied to SEN0232 (db Sensor)
+
+#define PMS7003_TX 12 // D6
+#define PMS7003_RX 14 // D5
+
 #define PMS7003_PREAMBLE_1 0x42 // From PMS7003 datasheet
 #define PMS7003_PREAMBLE_2 0x4D
 #define PMS7003_DATA_LENGTH 31
-#define BotToken "7706841902:AAG4sGQWfzoLxMo0NqCftb0wddZ9PjHv_ww" // https://t.me/SmartEnviroBot
+
+#define BotToken "7706841902:AAG4sGQWfzoLxMo0NqCftb0wddZ9PjHv_ww" // https://t.me/SmartEnviroBot //HIDE PLEASE!
 
 SoftwareSerial _serial(PMS7003_TX, PMS7003_RX); // RX,TX
-Adafruit_BME280 bme;
 
-String tele_Message;
-unsigned long bot_lasttime; // last time messages' scan has been done
-const unsigned long BOT_MTBS = 1000;
+Adafruit_BME280 bme; // BME280 library (temp,humid sensor)
+
+String tele_Message; // messages to send to user
+
+unsigned long bot_lasttime;          // last time messages' scan has been done
+const unsigned long BOT_MTBS = 1000; // no idea i copy from somewher
 
 unsigned long last_UploadTime;
 const unsigned long uploadInterval = 600000; // cam change for showcase
 
 unsigned long lastCheckHazardTime;
-const unsigned long checkHazard = 10000;
+const unsigned long checkHazard = 10000; // check environment every 10s for any hazardous levels
 
 unsigned long lastHazardMessageTime;
-const unsigned long hazardMessageInterval = 600000; // can change for showcase
-bool hazardMessageSent = false;
+const unsigned long hazardMessageInterval = 600000; // can change for showcase //10mins interval for hazard alerts
+bool hazardMessageSent = false;                     // used to not spam the user for hazard alerts
 
-int _pm1, _pm25, _pm10;
+int _pm1, _pm25, _pm10; // variables to store data after reading from sensors
 float _dB;
 float _temperature, _humidity;
 
 // const char* ssid = "Sean";
-// const char* password = "whatpassword";
+// const char* password = "whatpassword"; //my phone hotspot
 
 const char *ssid = "SHONDO 3544";
-const char *password = "testing123";
+const char *password = "testing123"; // laptop hotspot
 
 // const char *ssid = "TP-LINK_0248";
-// const char *password = "35353577";
+// const char *password = "35353577"; //hall wifi p
 
-String TS_apiKey = "EGLOW3A9ZEGHGOHD";
-const char *TS_server = "api.thingspeak.com";
+unsigned long myWriteChannelNumber = 2649409;   // channel where esp sends data to
+unsigned long myReadChannelNumber = 2660664;    // channel to read predicted values
+const char *myWriteAPIKey = "EGLOW3A9ZEGHGOHD"; // api for writing data
+const char *myReadAPIKey = "OYBEVIRYYKNZXSAY";  // api for reading data
 
-unsigned long myWriteChannelNumber = 2649409;
-unsigned long myReadChannelNumber = 2660664;
-const char *myWriteAPIKey = "EGLOW3A9ZEGHGOHD";
-const char *myReadAPIKey = "OYBEVIRYYKNZXSAY"; // to ask theem for channel
+X509List cert(TELEGRAM_CERTIFICATE_ROOT);   // needed for telebot
+WiFiClientSecure client;                    // for telebot
+WiFiClient TS_client;                       // for thingspeak, cannot use same cause TS wont work
+UniversalTelegramBot bot(BotToken, client); // telebot library
 
-X509List cert(TELEGRAM_CERTIFICATE_ROOT);
-WiFiClientSecure client;
-WiFiClient TS_client;
-UniversalTelegramBot bot(BotToken, client);
+int statusCode = 0; // status code to check if data is can read/write. will be used to display error code if there is error that happens
 
-// TelegramKeyboard keyboard_one; //todo if got time
-int statusCode = 0;
-int field[3] = {1, 2, 3};
-float predicted[3] = {NAN, NAN, NAN}; // pm2.5,pm10,dB
+float predicted[3] = {NAN, NAN, NAN}; // pm2.5,pm10,dB //to read data from predicted
 
 void uploadCloud2(float dB, int pm1, int pm25, int pm10, float temp, float humid)
 {
@@ -73,7 +75,7 @@ void uploadCloud2(float dB, int pm1, int pm25, int pm10, float temp, float humid
   ThingSpeak.setField(3, pm25);
   ThingSpeak.setField(4, pm10);
   ThingSpeak.setField(5, temp);
-  ThingSpeak.setField(6, humid);
+  ThingSpeak.setField(6, humid); // set which data is for which field
 
   int x = ThingSpeak.writeFields(myWriteChannelNumber, myWriteAPIKey);
   if (x == 200)
@@ -82,13 +84,13 @@ void uploadCloud2(float dB, int pm1, int pm25, int pm10, float temp, float humid
   }
   else
   {
-    Serial.println("Problem updating channel. HTTP error code " + String(x));
+    Serial.println("Problem updating channel. HTTP error code " + String(x)); // send error code if have
   }
 }
 
 void readTempHumdSensor()
 {
-  _temperature = bme.readTemperature();
+  _temperature = bme.readTemperature(); // from examples
   _humidity = bme.readHumidity();
   Serial.print("Temperature: ");
   Serial.print(_temperature);
@@ -102,7 +104,7 @@ void readTempHumdSensor()
 void readdBSensor()
 {
   float voltageValue;
-  voltageValue = analogRead(SoundSensorPin) / 1024.0 * VREF;
+  voltageValue = analogRead(SoundSensorPin) / 1024.0 * VREF; // from datasheet of sen0232 //VREF is declared on top
   _dB = voltageValue * 50.0;
   Serial.print("dB Value: ");
   Serial.print(_dB);
@@ -111,7 +113,7 @@ void readdBSensor()
 }
 void readPMSSensor()
 {
-  int checksum = 0;
+  int checksum = 0; // THIS IS COPIED I DONT UNDERSTAND BUT IT WORKS
   unsigned char pms[32] = {
       0,
   };
@@ -166,22 +168,23 @@ void readPMSSensor()
 
 void sendCurrentValuesToUser()
 {
-  readdBSensor();
+  readdBSensor(); // read from sensors
   readPMSSensor();
   readTempHumdSensor();
-  tele_Message = "🌡️ *Current Reading :*\n\n";                      // want to try to bold
-  tele_Message += "Temperature: " + String(_temperature) + " °C\n"; //+ tempTrend + "\n";
-  tele_Message += "Humidity: " + String(_humidity) + " %\n";        //+ humidityTrend + "\n";
-  tele_Message += "PM2.5: " + String(_pm25) + " µg/m³\n";           //+ pm25Trend + "\n";
-  tele_Message += "PM10: " + String(_pm10) + " µg/m³\n";            //+ pm10Trend + "\n";
-  tele_Message += "Noise Level: " + String(_dB) + " dB\n";          // + noiseTrend + "\n";
+
+  tele_Message = "🌡️ *Current Reading :*\n\n";
+  tele_Message += "Temperature: " + String(_temperature) + " °C\n";
+  tele_Message += "Humidity: " + String(_humidity) + " %\n";
+  tele_Message += "PM2.5: " + String(_pm25) + " µg/m³\n";
+  tele_Message += "PM10: " + String(_pm10) + " µg/m³\n";
+  tele_Message += "Noise Level: " + String(_dB) + " dB\n"; // set tele message
 }
 void sendPredictedValuesToUser()
 {
 
-  for (int i = 0; i < sizeof(predicted); i++)
+  for (int i = 0; i < sizeof(predicted); i++) // do for all 3 readings
   {
-    while (isnan(predicted[i]))
+    while (isnan(predicted[i])) // do while got any NAN still exist
     {
       predicted[i] = ThingSpeak.readFloatField(myReadChannelNumber, i + 1);
       statusCode = ThingSpeak.getLastReadStatus();
@@ -195,13 +198,12 @@ void sendPredictedValuesToUser()
   tele_Message = "🔮 *Predicted Environment!:*\n\n"; // want to try to bold
   tele_Message += "Predicted PM2.5: " + String(predicted[0]) + " µg/m³\n";
   tele_Message += "Predicted PM10: " + String(predicted[1]) + " µg/m³\n";
-  tele_Message += "Predicted Noise: " + String(predicted[2]) + " dB\n";
-  tele_Message += "\n[Predicted Gauges](https://thingspeak.mathworks.com/apps/matlab_visualizations/587793?height=auto&width=auto)\n";
+  tele_Message += "Predicted Noise: " + String(predicted[2]) + " dB\n"; // set tele message
 }
 
 void hazardCurrentValues()
 {
-  tele_Message = "⚠️ Hazardous Levels in the surronding area ⚠️\n";
+  tele_Message = "⚠️ Hazardous Levels in the surronding area ⚠️\n"; //replaces the telemessage with hazard message
   if (_dB >= 85 && _dB <= 89.9)
   {
     tele_Message += "Current Readings at " + String(_dB) + " dB!\n" + "Do not be in the area for more than 8 hours!\n" + "Risk of hearing damage!\n";
@@ -244,14 +246,17 @@ void hazardCurrentValues()
   {
     tele_Message += "Current Readings at " + String(_pm10) + " µg/m³!\n" + "Area is not safe!\nCurrently in Hazardous Range (>425)!" + "Wear a N95 mask or stay indoors!\n";
   }
-  bot.sendMessage("824917767", tele_Message, "");
-  hazardMessageSent = true;
-  lastHazardMessageTime = millis();
+
+  //needed to hardcode this. was damn tiring
+
+  bot.sendMessage("824917767", tele_Message, ""); //exclusive to my chat ONLY. //dont abuse my chatid pls
+  hazardMessageSent = true; //if hazard message is sent alrd, set to true so that need to wait 10mins
+  lastHazardMessageTime = millis(); //put the timing for the last hazard message
 }
 void hazardPredictedValues()
 {
 
-  tele_Message = "⚠️ Potential Hazardous Levels in the surronding area ⚠️\n";
+  tele_Message = "⚠️ Potential Hazardous Levels in the surronding area ⚠️\n"; //replaces the telemessage with hazard message
   if (predicted[2] >= 85 && predicted[2] <= 89.9)
   {
     tele_Message += "Predicted Readings at " + String(predicted[2]) + " dB!\n" + "Do not be in the area for more than 8 hours!\n" + "Risk of hearing damage!\n";
@@ -295,33 +300,45 @@ void hazardPredictedValues()
     tele_Message += "Predicted Readings at " + String(predicted[1]) + " µg/m³!\n" + "Area is not safe!\nPredicted readings at Hazardous Range (>425)!" + "Wear a N95 mask or stay indoors!\n";
   }
 
-  bot.sendMessage("824917767", tele_Message, "");
+  //shag is shag
 
-  hazardMessageSent = true;
+
+  bot.sendMessage("824917767", tele_Message, ""); //please.
+
+  hazardMessageSent = true; //same as current hazard 
   lastHazardMessageTime = millis();
 }
 
 void handleNewMessages(int numNewMessages)
 {
+  //referred from the telebot library
   Serial.print("handleNewMessages ");
   Serial.println(numNewMessages);
 
   for (int i = 0; i < numNewMessages; i++)
   {
-    String chat_id = bot.messages[i].chat_id;
-    String text = bot.messages[i].text;
+    String chat_id = bot.messages[i].chat_id; //get the user chatid
+    String text = bot.messages[i].text; //reads the user command
 
-    String from_name = bot.messages[i].from_name;
-
-    if (text == "/start")
+    if (text == "/start") //show all other commands with keyboard
     {
-      sendCurrentValuesToUser();
-      bot.sendMessage(chat_id, tele_Message, "");
+      String keyboardJson = "[[\"/Current\", \"/Predicted\"]]"; //keyboard design
+      tele_Message = "Welcome to Smart Monitoring System (Noise & Dust)\nWhat do you want to see?\n";
+      tele_Message += "/Current : Show the current environment Particulate Matter & dB\n";
+      tele_Message += "/Predicted : Show the predicted environment Particulate Matter & dB\n";
+      bot.sendMessageWithReplyKeyboard(chat_id, tele_Message, "", keyboardJson, true); //send messsage with keyboard. no idea why the true is there tho
     }
-    if (text == "/predicted")
+    if (text == "/Current") //send current values
     {
-      sendPredictedValuesToUser();
-      bot.sendMessage(chat_id, tele_Message, "");
+      sendCurrentValuesToUser(); //reads current values
+      String keyboardJson = "[[{ \"text\" : \"Current Gauges\", \"url\" : \"https://thingspeak.mathworks.com/apps/matlab_visualizations/586875?height=auto&width=auto\" }]]"; //add the url below message
+      bot.sendMessageWithInlineKeyboard(chat_id, tele_Message, "Markdown", keyboardJson); //send message with url
+    }
+    if (text == "/Predicted")
+    {
+      sendPredictedValuesToUser(); //reads predicted values //same as above just predicted
+      String keyboardJson = "[[{ \"text\" : \"Predicted Gauges\", \"url\" : \"https://thingspeak.mathworks.com/apps/matlab_visualizations/587793?height=auto&width=auto\" }]]";
+      bot.sendMessageWithInlineKeyboard(chat_id, tele_Message, "Markdown", keyboardJson); //same as above
     }
   }
 }
@@ -354,20 +371,20 @@ void setup()
 void loop()
 {
 
-  if (millis() - bot_lasttime > BOT_MTBS)
+  if (millis() - bot_lasttime > BOT_MTBS) //every 1sec scan for message
   {
-    int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1); //reads last message
 
-    while (numNewMessages)
+    while (numNewMessages) //copied from example
     {
       Serial.println("got response");
       handleNewMessages(numNewMessages);
-      numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+      numNewMessages = bot.getUpdates(bot.last_message_received + 1); //no clue the +1
     }
 
     bot_lasttime = millis();
   }
-  if (millis() - last_UploadTime >= uploadInterval)
+  if (millis() - last_UploadTime >= uploadInterval) //only do every 10mins, lmk if dont unds this
   {
     readdBSensor();
     readPMSSensor();
@@ -375,33 +392,33 @@ void loop()
     uploadCloud2(_dB, _pm1, _pm25, _pm10, _temperature, _humidity);
     last_UploadTime = millis();
   }
-  if (millis() - lastCheckHazardTime >= checkHazard)
+  if (millis() - lastCheckHazardTime >= checkHazard) //do every 10sec
   {
     readdBSensor();
     readPMSSensor();
     sendPredictedValuesToUser();
-    if ((_dB >= 85.0 || _pm25 >= 55.5 || _pm10 >= 255.0) && !hazardMessageSent)
+    if ((_dB >= 85.0 || _pm25 >= 55.5 || _pm10 >= 255.0) && !hazardMessageSent) //this is for hazard values, last part of the condition is to avoid spamming //if hazardmsg is sent, then hazardmessage is True making this if not to work
     {
       hazardCurrentValues();
     }
     else
     {
-      if (millis() - lastHazardMessageTime >= hazardMessageInterval)
+      if (millis() - lastHazardMessageTime >= hazardMessageInterval) //after 10mins then hazardmessagesent is set to false so means can send hazard message again if still got hazardvalues around
       {
         hazardMessageSent = false;
       }
     }
-    if (predicted[2] >= 85.0 || predicted[0] >= 55.5 || predicted[1] >= 255.0)
+    if (predicted[2] >= 85.0 || predicted[0] >= 55.5 || predicted[1] >= 255.0) //just for general checking every 10s
     {
       hazardPredictedValues();
     }
     else
     {
-      if (millis() - lastHazardMessageTime >= hazardMessageInterval)
+      if (millis() - lastHazardMessageTime >= hazardMessageInterval) //same as the above
       {
         hazardMessageSent = false;
       }
     }
-    lastCheckHazardTime = millis();
+    lastCheckHazardTime = millis(); //go online to see what is millis() if dont understand
   }
 }
