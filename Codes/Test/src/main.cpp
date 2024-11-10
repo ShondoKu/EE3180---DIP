@@ -1,11 +1,11 @@
 #include <Arduino.h>
-#include <WiFiClientSecure.h> //used for telegram and ESP
-#include <WiFiClient.h>       //used for TS
+#include <WiFiClientSecure.h> // used for telegram and ESP
+#include <WiFiClient.h>       // used for TS
 #include <ESP8266WiFi.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include <SoftwareSerial.h> //used for PMS7003
-#include <ArduinoJson.h>    //needed for Telebot library to work
+#include <SoftwareSerial.h> // used for PMS7003
+#include <ArduinoJson.h>    // needed for Telebot library to work
 #include <UniversalTelegramBot.h>
 #include "ThingSpeak.h"
 
@@ -19,7 +19,7 @@
 #define PMS7003_PREAMBLE_2 0x4D
 #define PMS7003_DATA_LENGTH 31
 
-#define BotToken "7706841902:AAG4sGQWfzoLxMo0NqCftb0wddZ9PjHv_ww" // https://t.me/SmartEnviroBot //HIDE PLEASE!
+#define BotToken "7706841902:AAG4sGQWfzoLxMo0NqCftb0wddZ9PjHv_ww" // https://t.me/SmartEnviroBot // HIDE PLEASE!
 
 SoftwareSerial _serial(PMS7003_TX, PMS7003_RX); // RX,TX
 
@@ -31,13 +31,13 @@ unsigned long bot_lasttime;          // last time messages' scan has been done
 const unsigned long BOT_MTBS = 1000; // no idea i copy from somewher
 
 unsigned long last_UploadTime;
-const unsigned long uploadInterval = 600000; // cam change for showcase
+const unsigned long uploadInterval = 600000; // can change for showcase
 
 unsigned long lastCheckHazardTime;
 const unsigned long checkHazard = 10000; // check environment every 10s for any hazardous levels
 
 unsigned long lastHazardMessageTime;
-const unsigned long hazardMessageInterval = 600000; // can change for showcase //10mins interval for hazard alerts
+const unsigned long hazardMessageInterval = 600000; // can change for showcase // 10mins interval for hazard alerts
 bool hazardMessageSent = false;                     // used to not spam the user for hazard alerts
 
 int _pm1, _pm25, _pm10; // variables to store data after reading from sensors
@@ -65,7 +65,7 @@ UniversalTelegramBot bot(BotToken, client); // telebot library
 
 int statusCode = 0; // status code to check if data is can read/write. will be used to display error code if there is error that happens
 
-float predicted[3] = {NAN, NAN, NAN}; // pm2.5,pm10,dB //to read data from predicted
+float predicted[3] = {NAN, NAN, NAN}; // pm2.5,pm10,dB // to read data from predicted
 
 void uploadCloud2(float dB, int pm1, int pm25, int pm10, float temp, float humid)
 {
@@ -249,9 +249,9 @@ void hazardCurrentValues()
 
   //needed to hardcode this. was damn tiring
 
-  bot.sendMessage("824917767", tele_Message, ""); //exclusive to my chat ONLY. //dont abuse my chatid pls
-  hazardMessageSent = true; //if hazard message is sent alrd, set to true so that need to wait 10mins
-  lastHazardMessageTime = millis(); //put the timing for the last hazard message
+  bot.sendMessage("824917767", tele_Message, ""); // exclusive to my chat ONLY. // dont abuse my chatid pls
+  hazardMessageSent = true; // if hazard message is sent alrd, set to true so that need to wait 10mins
+  lastHazardMessageTime = millis(); // put the timing for the last hazard message
 }
 void hazardPredictedValues()
 {
