@@ -4,24 +4,37 @@
 #include <ESP8266WiFi.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include <SoftwareSerial.h> // used for PMS7003
-#include <ArduinoJson.h>    // needed for Telebot library to work
+
+#include <ArduinoJson.h> // needed for Telebot library to work
 #include <UniversalTelegramBot.h>
 #include "ThingSpeak.h"
+#include <SoftwareSerial.h> // used for PMS7003
+
+// if used with ESP32 software serial is not needed
+#ifndef ESP32
+#include <SoftwareSerial.h>
+#endif
+#include "PMS7003-SOLDERED.h"
+
+int PMS_RX = 14;
+int PMS_TX = 12;
+
+#ifndef ESP32
+PMS7003 pms(PMS_RX, PMS_TX); // PMSx003, RX, TX
+#else
+PMS7003 pms(PMS_RX, PMS_TX); // PMSx003, RX, TX
+#endif
 
 #define SoundSensorPin A0 // SEN0232 Pin
 #define VREF 3            // voltage supplied to SEN0232 (db Sensor)
 
-#define PMS7003_TX 12 // D6
-#define PMS7003_RX 14 // D5
-
-#define PMS7003_PREAMBLE_1 0x42 // From PMS7003 datasheet
-#define PMS7003_PREAMBLE_2 0x4D
-#define PMS7003_DATA_LENGTH 31
+// #define PMS7003_PREAMBLE_1 0x42 // From PMS7003 datasheet
+// #define PMS7003_PREAMBLE_2 0x4D
+// #define PMS7003_DATA_LENGTH 31
 
 #define BotToken "7706841902:AAG4sGQWfzoLxMo0NqCftb0wddZ9PjHv_ww" // https://t.me/SmartEnviroBot // HIDE PLEASE!
 
-SoftwareSerial _serial(PMS7003_TX, PMS7003_RX); // RX,TX
+// SoftwareSerial _serial(PMS7003_TX, PMS7003_RX); // RX,TX
 
 Adafruit_BME280 bme; // BME280 library (temp,humid sensor)
 
@@ -111,65 +124,151 @@ void readdBSensor()
   Serial.println("  dB");
   Serial.println();
 }
-void readPMSSensor()
+// void readPMSSensor()
+// {
+//   int checksum = 0; // THIS IS COPIED I DONT UNDERSTAND BUT IT WORKS
+//   unsigned char pms[32] = {
+//       0,
+//   };
+
+//   /**
+//    * Search preamble for Packet
+//    * Solve trouble caused by delay function
+//    */
+//   while (_serial.available() &&
+//          _serial.read() != PMS7003_PREAMBLE_1 &&
+//          _serial.peek() != PMS7003_PREAMBLE_2)
+//   {
+//   }
+//   if (_serial.available() >= PMS7003_DATA_LENGTH)
+//   {
+//     pms[0] = PMS7003_PREAMBLE_1;
+//     checksum += pms[0];
+//     for (int j = 1; j < 32; j++)
+//     {
+//       pms[j] = _serial.read();
+//       if (j < 30)
+//         checksum += pms[j];
+//     }
+//     _serial.flush();
+//     if (pms[30] != (unsigned char)(checksum >> 8) || pms[31] != (unsigned char)(checksum))
+//     {
+//       Serial.println("Checksum error");
+//       return;
+//     }
+//     if (pms[0] != 0x42 || pms[1] != 0x4d)
+//     {
+//       Serial.println("Packet error");
+//       return;
+//     }
+//     _pm1 = makeWord(pms[10], pms[11]);
+//     _pm25 = makeWord(pms[12], pms[13]);
+//     _pm10 = makeWord(pms[14], pms[15]);
+//   }
+//   Serial.print("PM1 Value: ");
+//   Serial.print(_pm1);
+//   Serial.println("  µg/m³");
+//   Serial.println();
+//   Serial.print("PM2.5 Value: ");
+//   Serial.print(_pm25);
+//   Serial.println("  µg/m³");
+//   Serial.println();
+//   Serial.print("PM10 Value: ");
+//   Serial.print(_pm10);
+//   Serial.println("  µg/m³");
+//   Serial.println();
+// }
+void readPMSSensor2()
 {
-  int checksum = 0; // THIS IS COPIED I DONT UNDERSTAND BUT IT WORKS
-  unsigned char pms[32] = {
-      0,
-  };
 
-  /**
-   * Search preamble for Packet
-   * Solve trouble caused by delay function
-   */
-  while (_serial.available() &&
-         _serial.read() != PMS7003_PREAMBLE_1 &&
-         _serial.peek() != PMS7003_PREAMBLE_2)
-  {
+  pms.read(); // read the PM sensor
+  if (pms)
+  { // successfull read
+    Serial.print(F("PM1.0 "));
+    Serial.print(pms.pm01); // Read PM0.1 particles concentration
+    Serial.print(F(", "));
+    Serial.print(F("PM2.5 "));
+    Serial.print(pms.pm25); // Read PM2.5 particles concentration
+    Serial.print(F(", "));
+    Serial.print(F("PM10 "));
+    Serial.print(pms.pm10); // Read PM10.0 particles concentration
+    Serial.println(F(" [ug/m3]"));
+    _pm10 = pms.pm10;
+    _pm1 = pms.pm01;
+    _pm25 = pms.pm25;
+    if (pms.has_number_concentration())
+    {
+      Serial.print(F("N0.3 "));
+      Serial.print(pms.n0p3);
+      Serial.print(F(", "));
+      Serial.print(F("N0.5 "));
+      Serial.print(pms.n0p5);
+      Serial.print(F(", "));
+      Serial.print(F("N1.0 "));
+      Serial.print(pms.n1p0);
+      Serial.print(F(", "));
+      Serial.print(F("N2.5 "));
+      Serial.print(pms.n2p5);
+      Serial.print(F(", "));
+      Serial.print(F("N5.0 "));
+      Serial.print(pms.n5p0);
+      Serial.print(F(", "));
+      Serial.print(F("N10 "));
+      Serial.print(pms.n10p0);
+      Serial.println(F(" [#/100cc]"));
+    }
+
+    if (pms.has_temperature_humidity() || pms.has_formaldehyde())
+    {
+      Serial.print(pms.temp, 1);
+      Serial.print(F(" °C"));
+      Serial.print(F(", "));
+      Serial.print(pms.rhum, 1);
+      Serial.print(F(" %rh"));
+      Serial.print(F(", "));
+      Serial.print(pms.hcho, 2);
+      Serial.println(F(" mg/m3 HCHO"));
+    }
   }
-  if (_serial.available() >= PMS7003_DATA_LENGTH)
-  {
-    pms[0] = PMS7003_PREAMBLE_1;
-    checksum += pms[0];
-    for (int j = 1; j < 32; j++)
+  else
+  { // something went wrong
+    switch (pms.status)
     {
-      pms[j] = _serial.read();
-      if (j < 30)
-        checksum += pms[j];
+    case pms.OK: // should never come here
+      break;     // included to compile without warnings
+    case pms.ERROR_TIMEOUT:
+      Serial.println(F(PMS_ERROR_TIMEOUT));
+      break;
+    case pms.ERROR_MSG_UNKNOWN:
+      Serial.println(F(PMS_ERROR_MSG_UNKNOWN));
+      break;
+    case pms.ERROR_MSG_HEADER:
+      Serial.println(F(PMS_ERROR_MSG_HEADER));
+      break;
+    case pms.ERROR_MSG_BODY:
+      Serial.println(F(PMS_ERROR_MSG_BODY));
+      break;
+    case pms.ERROR_MSG_START:
+      Serial.println(F(PMS_ERROR_MSG_START));
+      break;
+    case pms.ERROR_MSG_LENGTH:
+      Serial.println(F(PMS_ERROR_MSG_LENGTH));
+      break;
+    case pms.ERROR_MSG_CKSUM:
+      Serial.println(F(PMS_ERROR_MSG_CKSUM));
+      break;
+    case pms.ERROR_PMS_TYPE:
+      Serial.println(F(PMS_ERROR_PMS_TYPE));
+      break;
     }
-    _serial.flush();
-    if (pms[30] != (unsigned char)(checksum >> 8) || pms[31] != (unsigned char)(checksum))
-    {
-      Serial.println("Checksum error");
-      return;
-    }
-    if (pms[0] != 0x42 || pms[1] != 0x4d)
-    {
-      Serial.println("Packet error");
-      return;
-    }
-    _pm1 = makeWord(pms[10], pms[11]);
-    _pm25 = makeWord(pms[12], pms[13]);
-    _pm10 = makeWord(pms[14], pms[15]);
   }
-  Serial.print("PM1 Value: ");
-  Serial.print(_pm1);
-  Serial.println("  µg/m³");
-  Serial.println();
-  Serial.print("PM2.5 Value: ");
-  Serial.print(_pm25);
-  Serial.println("  µg/m³");
-  Serial.println();
-  Serial.print("PM10 Value: ");
-  Serial.print(_pm10);
-  Serial.println("  µg/m³");
-  Serial.println();
+
+  // wait for 10 seconds
 }
-
 void sendCurrentValuesToUser()
 {
   readdBSensor(); // read from sensors
-  readPMSSensor();
+  readPMSSensor2();
   readTempHumdSensor();
 
   tele_Message = "🌡️ *Current Reading :*\n\n";
@@ -203,7 +302,7 @@ void sendPredictedValuesToUser()
 
 void hazardCurrentValues()
 {
-  tele_Message = "⚠️ Hazardous Levels in the surronding area ⚠️\n"; //replaces the telemessage with hazard message
+  tele_Message = "⚠️ Hazardous Levels in the surronding area ⚠️\n"; // replaces the telemessage with hazard message
   if (_dB >= 85 && _dB <= 89.9)
   {
     tele_Message += "Current Readings at " + String(_dB) + " dB!\n" + "Do not be in the area for more than 8 hours!\n" + "Risk of hearing damage!\n";
@@ -247,16 +346,16 @@ void hazardCurrentValues()
     tele_Message += "Current Readings at " + String(_pm10) + " µg/m³!\n" + "Area is not safe!\nCurrently in Hazardous Range (>425)!" + "Wear a N95 mask or stay indoors!\n";
   }
 
-  //needed to hardcode this. was damn tiring
+  // needed to hardcode this. was damn tiring
 
   bot.sendMessage("824917767", tele_Message, ""); // exclusive to my chat ONLY. // dont abuse my chatid pls
-  hazardMessageSent = true; // if hazard message is sent alrd, set to true so that need to wait 10mins
-  lastHazardMessageTime = millis(); // put the timing for the last hazard message
+  hazardMessageSent = true;                       // if hazard message is sent alrd, set to true so that need to wait 10mins
+  lastHazardMessageTime = millis();               // put the timing for the last hazard message
 }
 void hazardPredictedValues()
 {
 
-  tele_Message = "⚠️ Potential Hazardous Levels in the surronding area ⚠️\n"; //replaces the telemessage with hazard message
+  tele_Message = "⚠️ Potential Hazardous Levels in the surronding area ⚠️\n"; // replaces the telemessage with hazard message
   if (predicted[2] >= 85 && predicted[2] <= 89.9)
   {
     tele_Message += "Predicted Readings at " + String(predicted[2]) + " dB!\n" + "Do not be in the area for more than 8 hours!\n" + "Risk of hearing damage!\n";
@@ -300,45 +399,44 @@ void hazardPredictedValues()
     tele_Message += "Predicted Readings at " + String(predicted[1]) + " µg/m³!\n" + "Area is not safe!\nPredicted readings at Hazardous Range (>425)!" + "Wear a N95 mask or stay indoors!\n";
   }
 
-  //shag is shag
+  // shag is shag
 
+  bot.sendMessage("824917767", tele_Message, ""); // please.
 
-  bot.sendMessage("824917767", tele_Message, ""); //please.
-
-  hazardMessageSent = true; //same as current hazard 
+  hazardMessageSent = true; // same as current hazard
   lastHazardMessageTime = millis();
 }
 
 void handleNewMessages(int numNewMessages)
 {
-  //referred from the telebot library
+  // referred from the telebot library
   Serial.print("handleNewMessages ");
   Serial.println(numNewMessages);
 
   for (int i = 0; i < numNewMessages; i++)
   {
-    String chat_id = bot.messages[i].chat_id; //get the user chatid
-    String text = bot.messages[i].text; //reads the user command
+    String chat_id = bot.messages[i].chat_id; // get the user chatid
+    String text = bot.messages[i].text;       // reads the user command
 
-    if (text == "/start") //show all other commands with keyboard
+    if (text == "/start") // show all other commands with keyboard
     {
-      String keyboardJson = "[[\"/Current\", \"/Predicted\"]]"; //keyboard design
+      String keyboardJson = "[[\"/Current\", \"/Predicted\"]]"; // keyboard design
       tele_Message = "Welcome to Smart Monitoring System (Noise & Dust)\nWhat do you want to see?\n";
       tele_Message += "/Current : Show the current environment Particulate Matter & dB\n";
       tele_Message += "/Predicted : Show the predicted environment Particulate Matter & dB\n";
-      bot.sendMessageWithReplyKeyboard(chat_id, tele_Message, "", keyboardJson, true); //send messsage with keyboard. no idea why the true is there tho
+      bot.sendMessageWithReplyKeyboard(chat_id, tele_Message, "", keyboardJson, true); // send messsage with keyboard. no idea why the true is there tho
     }
-    if (text == "/Current") //send current values
+    if (text == "/Current") // send current values
     {
-      sendCurrentValuesToUser(); //reads current values
-      String keyboardJson = "[[{ \"text\" : \"Current Gauges\", \"url\" : \"https://thingspeak.mathworks.com/apps/matlab_visualizations/586875?height=auto&width=auto\" }]]"; //add the url below message
-      bot.sendMessageWithInlineKeyboard(chat_id, tele_Message, "Markdown", keyboardJson); //send message with url
+      sendCurrentValuesToUser();                                                                                                                                              // reads current values
+      String keyboardJson = "[[{ \"text\" : \"Current Gauges\", \"url\" : \"https://thingspeak.mathworks.com/apps/matlab_visualizations/586875?height=auto&width=auto\" }]]"; // add the url below message
+      bot.sendMessageWithInlineKeyboard(chat_id, tele_Message, "Markdown", keyboardJson);                                                                                     // send message with url
     }
     if (text == "/Predicted")
     {
-      sendPredictedValuesToUser(); //reads predicted values //same as above just predicted
+      sendPredictedValuesToUser(); // reads predicted values //same as above just predicted
       String keyboardJson = "[[{ \"text\" : \"Predicted Gauges\", \"url\" : \"https://thingspeak.mathworks.com/apps/matlab_visualizations/587793?height=auto&width=auto\" }]]";
-      bot.sendMessageWithInlineKeyboard(chat_id, tele_Message, "Markdown", keyboardJson); //same as above
+      bot.sendMessageWithInlineKeyboard(chat_id, tele_Message, "Markdown", keyboardJson); // same as above
     }
   }
 }
@@ -347,7 +445,6 @@ void setup()
 {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  _serial.begin(9600);
   bme.begin(0x76);
   configTime(0, 0, "pool.ntp.org");
   client.setTrustAnchors(&cert);
@@ -362,63 +459,63 @@ void setup()
   // print a new line, then print WiFi connected and the IP address
   Serial.println("");
   Serial.println("WiFi connected");
-  // Print the IP address
-  // Serial.println(WiFi.localIP());
-  // bot.begin();
   ThingSpeak.begin(TS_client);
+
+
+  pms.begin();
 }
 
 void loop()
 {
 
-  if (millis() - bot_lasttime > BOT_MTBS) //every 1sec scan for message
+  if (millis() - bot_lasttime > BOT_MTBS) // every 1sec scan for message
   {
-    int numNewMessages = bot.getUpdates(bot.last_message_received + 1); //reads last message
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1); // reads last message
 
-    while (numNewMessages) //copied from example
+    while (numNewMessages) // copied from example
     {
       Serial.println("got response");
       handleNewMessages(numNewMessages);
-      numNewMessages = bot.getUpdates(bot.last_message_received + 1); //no clue the +1
+      numNewMessages = bot.getUpdates(bot.last_message_received + 1); // no clue the +1
     }
 
     bot_lasttime = millis();
   }
-  if (millis() - last_UploadTime >= uploadInterval) //only do every 10mins, lmk if dont unds this
+  if (millis() - last_UploadTime >= uploadInterval) // only do every 10mins, lmk if dont unds this
   {
     readdBSensor();
-    readPMSSensor();
+    readPMSSensor2();
     readTempHumdSensor();
     uploadCloud2(_dB, _pm1, _pm25, _pm10, _temperature, _humidity);
     last_UploadTime = millis();
   }
-  if (millis() - lastCheckHazardTime >= checkHazard) //do every 10sec
+  if (millis() - lastCheckHazardTime >= checkHazard) // do every 10sec
   {
     readdBSensor();
-    readPMSSensor();
+    readPMSSensor2();
     sendPredictedValuesToUser();
-    if ((_dB >= 85.0 || _pm25 >= 55.5 || _pm10 >= 255.0) && !hazardMessageSent) //this is for hazard values, last part of the condition is to avoid spamming //if hazardmsg is sent, then hazardmessage is True making this if not to work
+    if ((_dB >= 85.0 || _pm25 >= 55.5 || _pm10 >= 255.0) && !hazardMessageSent) // this is for hazard values, last part of the condition is to avoid spamming //if hazardmsg is sent, then hazardmessage is True making this if not to work
     {
       hazardCurrentValues();
     }
     else
     {
-      if (millis() - lastHazardMessageTime >= hazardMessageInterval) //after 10mins then hazardmessagesent is set to false so means can send hazard message again if still got hazardvalues around
+      if (millis() - lastHazardMessageTime >= hazardMessageInterval) // after 10mins then hazardmessagesent is set to false so means can send hazard message again if still got hazardvalues around
       {
         hazardMessageSent = false;
       }
     }
-    if (predicted[2] >= 85.0 || predicted[0] >= 55.5 || predicted[1] >= 255.0) //just for general checking every 10s
+    if (predicted[2] >= 85.0 || predicted[0] >= 55.5 || predicted[1] >= 255.0) // just for general checking every 10s
     {
       hazardPredictedValues();
     }
     else
     {
-      if (millis() - lastHazardMessageTime >= hazardMessageInterval) //same as the above
+      if (millis() - lastHazardMessageTime >= hazardMessageInterval) // same as the above
       {
         hazardMessageSent = false;
       }
     }
-    lastCheckHazardTime = millis(); //go online to see what is millis() if dont understand
+    lastCheckHazardTime = millis(); // go online to see what is millis() if dont understand
   }
 }
