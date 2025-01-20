@@ -1,0 +1,33 @@
+##################################################
+# Syntax Coloring Map For Obstacle-Sensor-SOLDERED
+##################################################
+
+##################################################
+# Datatypes (KEYWORD1)
+##################################################
+
+PMS7003 KEYWORD1
+
+##################################################
+# Methods and Functions (KEYWORD2)
+##################################################
+
+begin	KEYWORD2
+init    KEYWORD2
+read    KEYWORD2
+sleep   KEYWORD2
+wake    KEYWORD2
+has_particulate_matter      KEYWORD2
+has_number_concentration    KEYWORD2
+has_temperature_humidity    KEYWORD2
+has_formaldehyde            KEYWORD2
+getSerialPort               KEYWORD2
+setSerialPort               KEYWORD2
+set_rhum_offset             KEYWORD2
+set_temp_offset             KEYWORD2
+get_rhum_offset             KEYWORD2
+get_temp_offset             KEYWORD2
+
+##################################################
+# Constants (LITERAL1)
+##################################################
